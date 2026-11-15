@@ -1,0 +1,41 @@
+# Replace entity IDs using HA's entity picker. Example: probe 2.
+type: vertical-stack
+cards:
+  - type: entities
+    title: CHEF iQ cook
+    entities:
+      - text.chef_iq_probe_2_cook_name
+      - number.chef_iq_probe_2_cook_target
+      - number.chef_iq_probe_2_cook_flip
+      - number.chef_iq_probe_2_cook_wrap
+      - number.chef_iq_probe_2_cook_rest
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: button
+        entity: button.chef_iq_probe_2_cook_start
+        name: Start
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.chef_iq_probe_2_cook_start
+      - type: button
+        entity: button.chef_iq_probe_2_cook_acknowledge
+        name: Continue
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.chef_iq_probe_2_cook_acknowledge
+      - type: button
+        entity: button.chef_iq_probe_2_cook_finish
+        name: End cook
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.chef_iq_probe_2_cook_finish
+          confirmation:
+            text: End this probe's active cook?

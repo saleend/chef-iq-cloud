@@ -1,0 +1,14 @@
+{
+  "domain": "chef_iq_cloud",
+  "name": "CHEF iQ Cloud + Bluetooth",
+  "codeowners": [
+    "@saleend"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/saleend/chef-iq-cloud",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/saleend/chef-iq-cloud/issues",
+  "requirements": [],
+  "version": "0.3.1"
+}

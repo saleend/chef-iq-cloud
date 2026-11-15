@@ -1,0 +1,33 @@
+{
+  "title": "CHEF iQ Cloud + Bluetooth",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect CHEF iQ cloud",
+        "description": "Enter your CHEF iQ account email and password. Passwords are not saved. The saved-session option is only for importing an existing locally prepared session. Wi-Fi and combined sensors are added alongside the official Bluetooth integration.",
+        "data": {
+          "use_saved_session": "Use the saved account session",
+          "email": "Email",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "session_missing": "Saved session missing. Uncheck saved session to sign in.",
+      "invalid_auth": "Sign-in failed or expired.",
+      "cannot_connect": "Cannot connect to CHEF iQ.",
+      "wrong_account": "Use the same account as before."
+    },
+    "abort": {
+      "already_configured": "This account is already connected.",
+      "reauth_successful": "Account sign-in updated."
+    }
+  }
+}
