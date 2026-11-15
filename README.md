@@ -19,9 +19,11 @@ Existing official Bluetooth integration entities remain available. Recipe browsi
 
 ## Install
 
-Until a repository is published, copy `custom_components/chef_iq_cloud` into your HA configuration's `custom_components` folder, then restart HA. Add **CHEF iQ Cloud + Bluetooth** under Settings → Devices & services. Enter your CHEF iQ email and password; saved-session import is off by default. The saved-session option is a development migration feature; ordinary installations should sign in normally.
+[![Open in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=saleend&repository=chef-iq-cloud&category=integration)
 
-When published, this repository can be added to the built-in Home Assistant Marketplace as an integration. It uses the current `hacs.json` metadata format. See [Marketplace publishing guidance](https://contributors.home-assistant.io/marketplace/guides/integrations/).
+Open the link above to add this repository to the built-in Marketplace as a custom integration repository, then install it. It can be installed directly while catalog listing is pending. This uses the current `hacs.json` metadata format.
+
+For manual installation, copy `custom_components/chef_iq_cloud` into your HA configuration's `custom_components` folder, then restart HA. Add **CHEF iQ Cloud + Bluetooth** under Settings → Devices & services. Enter your CHEF iQ email and password; saved-session import is off by default. The saved-session option is a development migration feature; ordinary installations should sign in normally.
 
 The optional Bluetooth source requires the official CHEF iQ integration and suitable Bluetooth coverage. The cloud source requires the hub to be online and linked to the account.
 
