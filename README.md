@@ -1,15 +1,15 @@
 # CHEF iQ Cloud + Bluetooth
 
-An unofficial Home Assistant custom integration for CHEF iQ thermometer hubs. Adds Wi-Fi readings, fresh-source Wi-Fi/Bluetooth temperature selection, cook monitoring, and manual cook controls synchronized with the CHEF iQ app and hub.
+An unofficial Home Assistant custom integration for CHEF iQ thermometer hubs. Adds Wi-Fi readings, fresh-source Wi-Fi/Bluetooth temperature selection, cook monitoring, and optional manual cook controls synchronized with the CHEF iQ app and hub.
 
-Maintainer: [@saleend](https://github.com/saleend). Version 0.3.1 is an early release. Cook control was tested on one CQ60-3C-HUB, three probes, and Home Assistant 2026.11.1. It is not yet listed in Home Assistant Marketplace.
+Maintainer: [@saleend](https://github.com/saleend). This is an early integration. The original cook-control flow was tested on one CQ60-3C-HUB, three probes, and Home Assistant 2026.11.1. It is not yet listed in Home Assistant Marketplace.
 
 ## Features
 
 - Wi-Fi food and ambient temperatures from the hub's cloud connection.
 - Combined temperatures select the freshest valid Wi-Fi or official CHEF iQ Bluetooth reading. They do not average readings.
 - Active cook names, targets, step definitions and timers, including app-created cooks.
-- Manual cook name, target, optional flip/wrap thresholds, and rest timer.
+- With cook controls enabled, set a manual cook name, target, optional flip/wrap thresholds, and rest timer.
 - Start creates the hub session and the cloud history association the app needs.
 - Continue explicitly advances the current paused step. A new cook normally waits for heat detection; Start does not automatically send Continue.
 - End affects the selected probe's session and verifies other sessions remain.
@@ -29,7 +29,11 @@ The optional Bluetooth source requires the official CHEF iQ integration and suit
 
 ## Controls
 
-Each discovered probe has cook name/target/flip/wrap/rest entities and Start, Continue and End buttons. Cook temperature settings are explicitly **°F** and rest is in minutes; zero disables an optional setting. Editing these entities configures the next cook and does not edit an active cook.
+New installations and upgrades to 0.3.2 default to read-only monitoring. Temperature sensors, cook status and step notifications are available with controls off. To control a cook, open **Settings → Devices & services → CHEF iQ Cloud + Bluetooth → Configure**, turn on **Enable cook controls**, and save. Upgrading users who rely on dashboard buttons or automations must enable this setting to use them again.
+
+With controls enabled, each discovered probe gains cook name, target, flip, wrap and rest entities plus Start, Continue, End and Check previous cook start buttons. Start writes to the hub and adds a record to your CHEF iQ account history. Continue and End send commands to the hub. See the hub reset described under **Verified behavior and limitations** before enabling these controls.
+
+Cook temperature settings are explicitly **°F** and rest is in minutes; zero disables an optional setting. Editing these entities configures the next cook and does not edit an active cook.
 
 Use HA's entity picker to add the controls to your dashboard. `examples/probe-controls.yaml` is an optional card example. This integration does not install a dashboard or modify an existing one.
 
@@ -41,7 +45,7 @@ If a start times out or only partly succeeds, inspect the official app before re
 
 The end-to-end HA dashboard test on November 15, 2026 created a spare-probe cook visible in the official app with the correct probe, live temperature, name and target. HA Continue advanced the app, remove-from-heat and a one-minute rest-complete alert reached HA, the app showed Cook Complete, and HA End produced the app's “ended from another device” message. A separate pork cook remained active throughout. Offline tests cover cook models, transaction failure boundaries, recovery and manager actions.
 
-An earlier experimental version preceded a hub reset that cleared existing sessions. The root cause remains unconfirmed. This version adds the missing app history flow, normalizes probe address casing, removes automatic immediate first-step activation, checks the current loaded step, and journals starts before writing. The successful bounded test does not establish long-term stability across all firmware, models or accounts. Begin additional testing with spare probes.
+An earlier experimental version preceded a hub reset that cleared existing sessions. The root cause remains unconfirmed. Version 0.3.1 includes the app history flow, normalizes probe address casing, removes automatic immediate first-step activation, checks the current loaded step, and journals starts before writing. The successful bounded test does not establish long-term stability across all firmware, models or accounts. Begin additional testing with spare probes.
 
 Other limits: region behavior beyond the tested US endpoints is unverified; simultaneous account sessions worked during this test but long-term compatibility is unconfirmed; audible hub announcements were not independently verified. The completed-cook cleanup stage is shown as Cook complete, and Bluetooth discovery uses the current multi-device registry API.
 
@@ -53,6 +57,6 @@ This repository contains no account tokens, device identifiers, private captures
 
 ## Development
 
-Run the three scripts in `tests/` from the repository root with Python and `aiohttp` installed. They use synthetic data and mocked HA callbacks and make no network requests. They are not a complete HA integration test suite. GitHub Actions also includes hassfest and Marketplace catalog validation; those checks must pass on the actual repository before submission.
+From the repository root, install the test dependencies listed in `.github/workflows/validate.yaml`, then run each `tests/test_*.py` script separately. They use synthetic data and mocked HA callbacks and make no network requests. They are not a complete HA integration test suite. GitHub Actions also includes hassfest and Marketplace catalog validation; those checks must pass on the actual repository before submission.
 
 See `SUBMISSION.md` for release and catalog steps, and `CHANGELOG.md` for changes.

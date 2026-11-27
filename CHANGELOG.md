@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 — Unreleased
+
+- Make cook controls opt-in for new and existing installations. Sensors and cook notifications work in read-only mode. Enable controls in the integration options to use Start, Continue and End.
+- Retry temporary token-refresh failures, including rate limits and server outages. Prompt for sign-in when the token endpoint explicitly rejects the refresh token.
+- Remove the unused Cancel cook button and load the public Firebase client key from a Python constant.
+
 ## 0.3.1 — November 15, 2026
 
 - Default setup to normal account sign-in; propagate duplicate-account flow aborts.

@@ -47,9 +47,10 @@ def matching_link(response, session_id, user_id):
 
 
 class HistoryClient:
-    def __init__(self, session, headers):
+    def __init__(self, session, headers, check_write=None):
         self.session = session
         self.headers = headers
+        self.check_write = check_write
 
     async def links(self, session_id):
         return await json_request(
@@ -59,5 +60,7 @@ class HistoryClient:
         )
 
     async def create(self, body):
+        if self.check_write is not None:
+            self.check_write()
         # No automatic retry: a timed-out POST may already have succeeded.
         return await json_request(self.session, USERS + "/cooking-history", body, self.headers)

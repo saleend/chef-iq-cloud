@@ -9,10 +9,14 @@ from . import DOMAIN
 
 async def setup_controls(hass, entry, add, factory):
     manager = hass.data[DOMAIN][entry.entry_id]
+    if not manager.cook_controls_enabled:
+        return
     known = set()
 
     @callback
     def discover():
+        if not manager.cook_controls_enabled:
+            return
         entities = []
         for address in manager.probes:
             if address not in known:
@@ -62,4 +66,4 @@ class CookEntity(Entity):
 
     @property
     def available(self):
-        return self.manager.connected
+        return self.manager.cook_controls_enabled and self.manager.connected

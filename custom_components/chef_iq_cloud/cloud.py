@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
 
-from aiohttp import WSMsgType
+from aiohttp import ClientError, WSMsgType
 
 
 class CloudError(Exception):
@@ -37,19 +37,37 @@ async def json_request(session, url, data=None, headers=None):
 
 
 async def refresh(session, api_key, refresh_token):
-    async with session.post(
-        "https://securetoken.googleapis.com/v1/token",
-        params={"key": api_key},
-        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-        timeout=30,
-        allow_redirects=False,
-    ) as r:
-        if r.status != 200:
+    try:
+        async with session.post(
+            "https://securetoken.googleapis.com/v1/token",
+            params={"key": api_key},
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=30,
+            allow_redirects=False,
+        ) as response:
+            status = response.status
+            if status not in (200, 400, 401):
+                raise CloudError(f"Account session refresh failed (HTTP {status})")
+            data = await response.json(content_type=None)
+    except (ClientError, TimeoutError, ValueError):
+        raise CloudError("Could not read the account session response") from None
+
+    if not isinstance(data, dict):
+        raise CloudError("Unexpected account session response")
+    if status in (400, 401):
+        error = data.get("error")
+        if isinstance(error, dict):
+            error = error.get("message")
+        if error in ("INVALID_REFRESH_TOKEN", "TOKEN_EXPIRED", "invalid_grant"):
             raise AuthError("Account session refresh rejected")
-        data = await r.json()
-        if not data.get("id_token"):
-            raise AuthError("Missing account session")
-        return data
+        raise CloudError(f"Account session refresh failed (HTTP {status})")
+    if not isinstance(data.get("id_token"), str) or not data["id_token"]:
+        raise CloudError("Missing account session")
+    if "refresh_token" in data and not (
+        isinstance(data["refresh_token"], str) and data["refresh_token"]
+    ):
+        raise CloudError("Invalid refresh response")
+    return data
 
 
 async def login(session, api_key, email, password):
