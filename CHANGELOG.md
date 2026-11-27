@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.2 — Unreleased
+## 0.3.2 — November 27, 2026
 
 - Make cook controls opt-in for new and existing installations. Sensors and cook notifications work in read-only mode. Enable controls in the integration options to use Start, Continue and End.
 - Retry temporary token-refresh failures, including rate limits and server outages. Prompt for sign-in when the token endpoint explicitly rejects the refresh token.
