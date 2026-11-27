@@ -1,12 +1,22 @@
 """Explicit hub actions. No cook changes are made automatically."""
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.helpers import entity_registry as er
 
+from . import DOMAIN
 from .cook_entity import CookEntity, setup_controls
 from .cook_sync import RESOLVED_PHASES
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            entity.platform == DOMAIN
+            and entity.domain == "button"
+            and entity.unique_id.endswith("_cook_cancel")
+        ):
+            registry.async_remove(entity.entity_id)
     await setup_controls(
         hass,
         entry,
@@ -17,7 +27,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
                 ("start", "Start synced cook"),
                 ("acknowledge", "Continue current step"),
                 ("finish", "End cook"),
-                ("cancel", "Cancel cook"),
                 ("reconcile", "Check previous cook start"),
             ]
         ],
@@ -30,7 +39,7 @@ class CookButton(CookEntity, ButtonEntity):
 
     @property
     def available(self):
-        if not self.manager.connected or self.manager.controls_fault or self.key == "cancel":
+        if not super().available or self.manager.controls_fault:
             return False
         cook = self.manager.cook_for(self.address)
         if self.key == "reconcile":

@@ -29,5 +29,16 @@
       "already_configured": "This account is already connected.",
       "reauth_successful": "Account sign-in updated."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Cook controls",
+        "description": "Sensors and cook notifications work with controls off. Enabling controls allows Home Assistant to start, continue and end cooks on your hub and add new cooks to your CHEF iQ account history. An earlier experimental version preceded a hub reset that cleared active sessions. The cause remains unknown.",
+        "data": {
+          "enable_cook_controls": "Enable cook controls"
+        }
+      }
+    }
   }
 }

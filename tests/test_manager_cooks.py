@@ -1,5 +1,6 @@
 import sys, types, importlib.util, asyncio, time, unittest
 import importlib
+from unittest.mock import AsyncMock, Mock
 from pathlib import Path
 
 
@@ -51,12 +52,156 @@ spec.loader.exec_module(c)
 
 
 class Tests(unittest.IsolatedAsyncioTestCase):
-    def manager(self):
+    def manager(self, *, controls=False):
         h = types.SimpleNamespace()
-        e = types.SimpleNamespace(entry_id="test", options={})
+        options = {c.CONF_ENABLE_COOK_CONTROLS: True} if controls else {}
+        e = types.SimpleNamespace(entry_id="test", options=options)
         m = c.Manager(h, e)
         m.devices = [{"device_id": "hub"}]
         return m
+
+    async def test_disabled_controls_block_writes_from_legacy_and_opted_out_entries(self):
+        for options in (
+            {"cook_settings": {"A": {"target": 150}}},
+            {c.CONF_ENABLE_COOK_CONTROLS: False},
+        ):
+            with self.subTest(options=options):
+                m = self.manager()
+                m.entry.options = options
+                m.connected = True
+                m.sender = AsyncMock()
+                with self.assertRaisesRegex(HAError, "Enable cook controls"):
+                    await m.start_cook("A")
+                for action in ("acknowledge", "finish"):
+                    with self.assertRaisesRegex(HAError, "Enable cook controls"):
+                        await m.cook_action("A", action)
+                with self.assertRaisesRegex(HAError, "Enable cook controls"):
+                    await m.request("hub", "start-session", {})
+                with self.assertRaisesRegex(HAError, "Enable cook controls"):
+                    m.set_setting("A", "target", 150)
+                m.sender.assert_not_called()
+
+    async def test_disabling_controls_before_history_write_blocks_post(self):
+        m = self.manager(controls=True)
+        session = Mock()
+        history = c.HistoryClient(session, {}, m.require_cook_controls)
+        m.entry.options[c.CONF_ENABLE_COOK_CONTROLS] = False
+        with self.assertRaisesRegex(HAError, "Enable cook controls"):
+            await history.create({})
+        session.request.assert_not_called()
+
+    async def test_control_platforms_require_opt_in_and_remove_retired_button(self):
+        module("homeassistant.helpers.entity", Entity=object)
+        module("homeassistant.components.button", ButtonEntity=object)
+        module(
+            "homeassistant.components.number",
+            NumberEntity=object,
+            NumberMode=types.SimpleNamespace(BOX="box"),
+        )
+        module(
+            "homeassistant.components.text",
+            TextEntity=object,
+            TextMode=types.SimpleNamespace(TEXT="text"),
+        )
+        registry = Mock()
+        old = types.SimpleNamespace(
+            platform=c.DOMAIN, domain="button", unique_id="A_cook_cancel", entity_id="button.old"
+        )
+        current = types.SimpleNamespace(
+            platform=c.DOMAIN, domain="button", unique_id="A_cook_start", entity_id="button.start"
+        )
+        other_platform = types.SimpleNamespace(
+            platform="other", domain="button", unique_id=old.unique_id, entity_id="button.other"
+        )
+        other_domain = types.SimpleNamespace(
+            platform=c.DOMAIN, domain="sensor", unique_id=old.unique_id, entity_id="sensor.other"
+        )
+        entries_for_config = Mock(return_value=[old, current, other_platform, other_domain])
+        er = module(
+            "homeassistant.helpers.entity_registry",
+            async_get=lambda hass: registry,
+            async_entries_for_config_entry=entries_for_config,
+        )
+        sys.modules["homeassistant.helpers"].entity_registry = er
+        listeners = []
+        sys.modules["homeassistant.helpers.dispatcher"].async_dispatcher_connect = (
+            lambda hass, signal, discover: listeners.append(discover)
+        )
+        m = self.manager()
+        m.entry.async_on_unload = Mock()
+        m.hass.data = {c.DOMAIN: {m.entry.entry_id: m}}
+        m.probes["A"] = {"number": 1}
+        entities = []
+        platforms = [
+            importlib.import_module(f"chef_iq_cloud.{name}")
+            for name in ("number", "text", "button")
+        ]
+        for platform in platforms:
+            await platform.async_setup_entry(m.hass, m.entry, entities.extend)
+        self.assertEqual(entities, [])
+        self.assertEqual(listeners, [])
+        entries_for_config.assert_called_once_with(registry, m.entry.entry_id)
+        registry.async_remove.assert_called_once_with("button.old")
+
+        m.entry.options[c.CONF_ENABLE_COOK_CONTROLS] = True
+        for platform in platforms:
+            await platform.async_setup_entry(m.hass, m.entry, entities.extend)
+        self.assertCountEqual(
+            [entity.key for entity in entities],
+            [
+                "target",
+                "flip",
+                "wrap",
+                "rest",
+                "name",
+                "start",
+                "acknowledge",
+                "finish",
+                "reconcile",
+            ],
+        )
+        self.assertEqual(len(listeners), 3)
+        m.entry.options[c.CONF_ENABLE_COOK_CONTROLS] = False
+        m.probes["B"] = {"number": 2}
+        for discover in listeners:
+            discover()
+        self.assertEqual(len(entities), 9)
+
+    async def test_options_flow_defaults_off_and_preserves_saved_probe_settings(self):
+        class ConfigFlow:
+            def __init_subclass__(cls, domain):
+                super().__init_subclass__()
+
+        class OptionsFlowWithReload:
+            def async_show_form(self, **result):
+                return result
+
+            def async_create_entry(self, **result):
+                return result
+
+        config_entries = module(
+            "homeassistant.config_entries",
+            ConfigFlow=ConfigFlow,
+            OptionsFlowWithReload=OptionsFlowWithReload,
+        )
+        sys.modules["homeassistant"].config_entries = config_entries
+        module("homeassistant.data_entry_flow", AbortFlow=Exception)
+        flow_module = importlib.import_module("chef_iq_cloud.config_flow")
+        entry = self.manager().entry
+        entry.options = {"cook_settings": {"A": {"target": 150}}}
+        flow = flow_module.ConfigFlow.async_get_options_flow(entry)
+        self.assertIsInstance(flow, OptionsFlowWithReload)
+        flow.config_entry = entry
+        option = c.CONF_ENABLE_COOK_CONTROLS
+        form = await flow.async_step_init()
+        self.assertFalse(form["data_schema"]({})[option])
+        result = await flow.async_step_init({option: True})
+        self.assertEqual(result["data"], {**entry.options, option: True})
+        entry.options = result["data"]
+        form = await flow.async_step_init()
+        self.assertTrue(form["data_schema"]({})[option])
+        result = await flow.async_step_init({option: False})
+        self.assertEqual(result["data"], {"cook_settings": {"A": {"target": 150}}, option: False})
 
     async def test_merge_and_end_sessions(self):
         m = self.manager()
@@ -136,7 +281,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("notification_key", events[0])
 
     async def test_control_fault_blocks_all_writes(self):
-        m = self.manager()
+        m = self.manager(controls=True)
         m.controls_fault = True
         with self.assertRaises(HAError):
             await m.start_cook("A")
@@ -145,7 +290,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
                 await m.cook_action("A", action)
 
     async def test_continue_uses_current_loaded_paused_step_only(self):
-        m = self.manager()
+        m = self.manager(controls=True)
         calls = []
         m.sessions = {
             "s": {
@@ -181,7 +326,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
 
     async def test_end_only_selected_session_and_verify_others(self):
-        m = self.manager()
+        m = self.manager(controls=True)
         calls = []
         m.sessions = {
             "s": {"session_id": "s", "hub_id": "hub", "probe_address": "a"},
@@ -204,7 +349,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
     async def test_manager_start_connects_history_and_journal_without_auto_continue(
         self,
     ):
-        m = self.manager()
+        m = self.manager(controls=True)
         m.devices[0]["model_number"] = "CQ60-3C-HUB"
         m.auth_headers = {}
         m.user_id = "user"

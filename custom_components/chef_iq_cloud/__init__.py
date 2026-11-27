@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
 
 from .cloud import AuthError, json_request, refresh, stream
+from .const import CONF_ENABLE_COOK_CONTROLS
 from .cook_sync import StartTransaction, reconcile_journal
 from .cooks import start_payload
 from .history import HistoryClient, history_body
@@ -44,7 +45,9 @@ async def async_unload_entry(hass, entry):
     )
     if ok:
         manager = hass.data[DOMAIN].pop(entry.entry_id)
-        manager.stop()
+        # Finish journal updates before the next setup loads this entry's journal.
+        async with manager.cook_lock:
+            manager.stop()
         if manager.task:
             try:
                 await manager.task
@@ -112,7 +115,20 @@ class Manager:
         self.sender = sender
         self.hass.async_create_task(self.refresh_cooks())
 
+    @property
+    def cook_controls_enabled(self):
+        return (
+            self.entry.options.get(CONF_ENABLE_COOK_CONTROLS) is True
+            and not self.stop_event.is_set()
+        )
+
+    def require_cook_controls(self):
+        if not self.cook_controls_enabled:
+            raise HomeAssistantError("Enable cook controls in the integration options first")
+
     async def request(self, device, command, data):
+        if command != "get-state":
+            self.require_cook_controls()
         if not self.connected or not self.sender:
             raise HomeAssistantError("CHEF iQ hub is not connected")
         rid = str(uuid.uuid4())
@@ -146,6 +162,7 @@ class Manager:
                 raise
 
     def set_setting(self, address, key, value):
+        self.require_cook_controls()
         self.settings[address][key] = value
         self.hass.config_entries.async_update_entry(
             self.entry, options={**self.entry.options, "cook_settings": self.settings}
@@ -182,6 +199,7 @@ class Manager:
 
     async def start_cook(self, address):
         async with self.cook_lock:
+            self.require_cook_controls()
             if self.controls_fault or not self.auth_headers:
                 raise HomeAssistantError("Cook control unavailable; inspect the hub and app")
             probe = self.probes.get(address, {})
@@ -233,7 +251,9 @@ class Manager:
             async def send(data):
                 await self.request(device, "start-session", data)
 
-            history = HistoryClient(async_get_clientsession(self.hass), self.auth_headers)
+            history = HistoryClient(
+                async_get_clientsession(self.hass), self.auth_headers, self.require_cook_controls
+            )
             tx = StartTransaction(read, send, history, save, self.cook_journal, self.user_id)
             try:
                 await tx.start(
@@ -254,6 +274,7 @@ class Manager:
 
     async def cook_action(self, address, action):
         async with self.cook_lock:
+            self.require_cook_controls()
             if self.controls_fault:
                 raise HomeAssistantError("Cook control stopped after a hub alert; inspect the app")
             if action not in ("acknowledge", "finish"):

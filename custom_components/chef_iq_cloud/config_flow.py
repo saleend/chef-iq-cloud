@@ -5,17 +5,22 @@ from pathlib import Path
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from . import DOMAIN
 from .cloud import AuthError, login, refresh
-
-CONFIG = json.loads(Path(__file__).with_name("app_config.json").read_text())
+from .const import CONF_ENABLE_COOK_CONTROLS, FIREBASE_API_KEY
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return CookOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         errors = {}
@@ -27,13 +32,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data = await self.hass.async_add_executor_job(
                         lambda: json.loads(path.read_text())
                     )
-                    auth = await refresh(session, CONFIG["firebase_api_key"], data["refresh_token"])
+                    auth = await refresh(session, FIREBASE_API_KEY, data["refresh_token"])
                     refresh_token = auth["refresh_token"]
                     user_id = auth["user_id"]
                 else:
                     auth = await login(
                         session,
-                        CONFIG["firebase_api_key"],
+                        FIREBASE_API_KEY,
                         user_input.get("email", ""),
                         user_input.get("password", ""),
                     )
@@ -44,7 +49,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(
                     title="CHEF iQ Cloud + Bluetooth",
                     data={
-                        "firebase_api_key": CONFIG["firebase_api_key"],
+                        "firebase_api_key": FIREBASE_API_KEY,
                         "refresh_token": refresh_token,
                         "user_id": user_id,
                     },
@@ -78,7 +83,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 auth = await login(
                     async_get_clientsession(self.hass),
-                    CONFIG["firebase_api_key"],
+                    FIREBASE_API_KEY,
                     user_input["email"],
                     user_input["password"],
                 )
@@ -95,4 +100,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=vol.Schema({vol.Required("email"): str, vol.Required("password"): str}),
             errors=errors,
+        )
+
+
+class CookOptionsFlow(config_entries.OptionsFlowWithReload):
+    async def async_step_init(self, user_input=None):
+        options = self.config_entry.options
+        if user_input is not None:
+            return self.async_create_entry(data={**options, **user_input})
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ENABLE_COOK_CONTROLS,
+                        default=options.get(CONF_ENABLE_COOK_CONTROLS, False),
+                    ): bool,
+                }
+            ),
         )

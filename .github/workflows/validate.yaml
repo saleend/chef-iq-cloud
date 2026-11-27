@@ -20,9 +20,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: python -m pip install aiohttp ruff
+      - run: python -m pip install aiohttp ruff voluptuous
       - run: ruff check custom_components
       - run: ruff format --check custom_components tests
-      - run: python tests/test_cooks.py
-      - run: python tests/test_manager_cooks.py
-      - run: python tests/test_cook_sync.py
+      - name: Run offline regression tests
+        run: |
+          for test_file in tests/test_*.py; do
+            python "$test_file"
+          done
