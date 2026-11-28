@@ -189,6 +189,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         )
         sys.modules["homeassistant"].config_entries = config_entries
         module("homeassistant.data_entry_flow", AbortFlow=Exception)
+
         class TextSelector:
             def __init__(self, config):
                 self.config = config
