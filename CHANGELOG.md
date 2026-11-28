@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 — November 27, 2026
+
+- Mask account password fields during initial setup and reauthentication using Home Assistant's password selector.
+
 ## 0.3.2 — November 27, 2026
 
 - Make cook controls opt-in for new and existing installations. Sensors and cook notifications work in read-only mode. Enable controls in the integration options to use Start, Continue and End.

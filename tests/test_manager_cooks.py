@@ -172,6 +172,9 @@ class Tests(unittest.IsolatedAsyncioTestCase):
             def __init_subclass__(cls, domain):
                 super().__init_subclass__()
 
+            def async_show_form(self, **result):
+                return result
+
         class OptionsFlowWithReload:
             def async_show_form(self, **result):
                 return result
@@ -186,7 +189,31 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         )
         sys.modules["homeassistant"].config_entries = config_entries
         module("homeassistant.data_entry_flow", AbortFlow=Exception)
+        class TextSelector:
+            def __init__(self, config):
+                self.config = config
+
+            def __call__(self, value):
+                return value
+
+        module(
+            "homeassistant.helpers.selector",
+            TextSelector=TextSelector,
+            TextSelectorConfig=lambda **kwargs: kwargs,
+            TextSelectorType=types.SimpleNamespace(PASSWORD="password"),
+        )
         flow_module = importlib.import_module("chef_iq_cloud.config_flow")
+        config_flow = flow_module.ConfigFlow()
+        for step in (config_flow.async_step_user, config_flow.async_step_reauth_confirm):
+            form = await step()
+            schema = form["data_schema"]
+            selector = next(value for key, value in schema.schema.items() if key == "password")
+            self.assertIsInstance(selector, TextSelector)
+            self.assertEqual(selector.config["type"], "password")
+            self.assertEqual(
+                schema({"email": "test@example.com", "password": "test-password"})["password"],
+                "test-password",
+            )
         entry = self.manager().entry
         entry.options = {"cook_settings": {"A": {"target": 150}}}
         flow = flow_module.ConfigFlow.async_get_options_flow(entry)

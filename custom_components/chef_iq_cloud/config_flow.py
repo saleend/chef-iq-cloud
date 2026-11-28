@@ -8,6 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from . import DOMAIN
 from .cloud import AuthError, login, refresh
@@ -68,7 +69,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Optional("use_saved_session", default=False): bool,
                     vol.Optional("email", default=""): str,
-                    vol.Optional("password", default=""): str,
+                    vol.Optional("password", default=""): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
                 }
             ),
             errors=errors,
@@ -98,7 +101,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_auth"
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required("email"): str, vol.Required("password"): str}),
+            data_schema=vol.Schema(
+                {
+                    vol.Required("email"): str,
+                    vol.Required("password"): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
+                }
+            ),
             errors=errors,
         )
 
